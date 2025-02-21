@@ -21,11 +21,15 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.airbnb.lottie.LottieAnimationView;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
+import com.naver.maps.geometry.LatLng;
 import com.naver.maps.map.MapFragment;
+import com.naver.maps.map.MapView;
 import com.naver.maps.map.NaverMap;
 import com.naver.maps.map.NaverMapOptions;
 import com.naver.maps.map.OnMapReadyCallback;
 import com.naver.maps.map.UiSettings;
+import com.naver.maps.map.overlay.Marker;
+import com.naver.maps.map.overlay.OverlayImage;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -37,7 +41,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
 
 public class TourType extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -52,6 +55,8 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
     String selectedTourItem;
     LottieAnimationView noDataAnim;
     NaverMap naverMap;
+    private List<LatLng> markerPositions = new ArrayList<>();   // mapX와 mapY를 double타입의 전역변수 선언
+    private List<Marker> markersOnMap = new ArrayList<>();  // 마커를 저장할 리스트 추가
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,6 +110,12 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
         uiSettings.setLocationButtonEnabled(false);     // 위치 버튼 비활성화
         uiSettings.setIndoorLevelPickerEnabled(false);  // 실내 층 선택 버튼 비활성화
         uiSettings.setLogoClickEnabled(false);          // 네이버 로고 클릭 이벤트 비활성화
+
+        // 마커 찍기
+//        Marker marker = new Marker();
+//        marker.setPosition(new LatLng(36.763695, 127.281796));
+//        marker.setMap(naverMap);
+        addMarkerToMap();
     }
 
     public class getAreaFromLocation extends AsyncTask<Void, Void, Map<String, String>> {
@@ -468,6 +479,8 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
                 String title = null;
                 String addr = null;
                 String type = null;
+                String mapX = null;
+                String mapY = null;
 
                 while (eventType != XmlPullParser.END_DOCUMENT) {
                     if (eventType == XmlPullParser.START_TAG) {
@@ -481,6 +494,12 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
                         } else if (tagName.equals("cat1")) {
                             parser.next();
                             type = parser.getText();
+                        } else if (tagName.equals("mapx")) {
+                            parser.next();
+                            mapX = parser.getText();
+                        } else if (tagName.equals("mapy")) {
+                            parser.next();
+                            mapY = parser.getText();
                         }
                     } else if (eventType == XmlPullParser.END_TAG) {
                         tagName = parser.getName();
@@ -489,6 +508,11 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
                             Map<String, String> itemData = new LinkedHashMap<>();
                             itemData.put("addr", addr);
                             itemData.put("type", type);
+                            itemData.put("mapx", mapX);
+                            itemData.put("mapy", mapY);
+
+                            Log.d("mapX1   ", "mapX1   " + mapX);
+                            Log.d("mapY1   ", "mapY1   " + mapY);
 
                             // title을 키로 전체 데이터를 저장
                             searchTour.put(title, itemData);
@@ -497,8 +521,6 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
                             title = null;
                             addr = null;
                             type = null;
-
-//                            callAddr(queryUrl);
                         }
                     }
                     eventType = parser.next();
@@ -516,6 +538,31 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
             if (!tourMapMap.isEmpty()) {
                 setupTourList(tourMapMap);
                 noDataAnim.setVisibility(View.GONE);
+
+                markerPositions.clear(); // 이전 마커 데이터 초기화
+                clearMarker();  // 지도에서 이전 마커들 제거
+
+                // <향상된 For문>
+                // String = key값 / Map<String, String> = value값
+                // tourMapMap.entrySet() = Map의 모든 항목(키-값 쌍)을 포함하는 객체
+                // : = for문을 통해 tourMapMap.entrySet()의 모든 항목을 순회 하는 부분
+                // tourMapMap는 Map<String, Map<String, String>>이므로, entrySet()을 호출하면 Set<Map.Entry<String, Map<String, String>>>가 반환
+                // for (Map.Entry<String, Map<String, String>> entry : tourMapMap.entrySet()): 이 for문은 tourMapMap의 모든 항목(각 Map.Entry)을 순차적으로 가져옴
+                for (Map.Entry<String, Map<String, String>> entry : tourMapMap.entrySet()) {
+                    Map<String, String> itemData = entry.getValue();
+                    try {
+                        double mapX = Double.parseDouble(itemData.get("mapx"));
+                        double mapY = Double.parseDouble(itemData.get("mapy"));
+                        markerPositions.add(new LatLng(mapY, mapX)); // 네이버 지도는 (위도, 경도) 순서
+                    } catch (NumberFormatException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                if (naverMap != null) {
+                    addMarkerToMap();
+                }
+
             } else {
                 // RecyclerView에 "데이터가 없습니다" 메시지 표시
                 tourResultRecycle = findViewById(R.id.tour_result_recycle);
@@ -525,6 +572,26 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
                 tourResultRecycle.setAdapter(emptyAdapter);
                 noDataAnim.setVisibility(View.VISIBLE);
             }
+        }
+    }
+
+    private void clearMarker() {
+        for (Marker marker : markersOnMap) {
+            marker.setMap(null);
+        }
+        markersOnMap.clear();
+    }
+
+    private void addMarkerToMap() {
+        if (naverMap == null) {
+            return;
+        }
+
+        for (LatLng position : markerPositions) {
+            Marker marker = new Marker();
+            marker.setPosition(position);
+            marker.setMap(naverMap);
+            markersOnMap.add(marker);
         }
     }
 
