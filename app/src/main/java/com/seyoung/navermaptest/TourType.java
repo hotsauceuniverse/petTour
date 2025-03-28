@@ -1,5 +1,6 @@
 package com.seyoung.navermaptest;
 
+import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
@@ -30,6 +31,7 @@ import com.naver.maps.map.OnMapReadyCallback;
 import com.naver.maps.map.UiSettings;
 import com.naver.maps.map.overlay.Marker;
 import com.naver.maps.map.overlay.OverlayImage;
+import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -57,11 +59,15 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
     NaverMap naverMap;
     private List<LatLng> markerPositions = new ArrayList<>();   // mapX와 mapY를 double타입의 전역변수 선언
     private List<Marker> markersOnMap = new ArrayList<>();  // 마커를 저장할 리스트 추가
+    private SlidingUpPanelLayout mainPanel;
+    Context mContext;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.tour_type);
+
+        mainPanel = findViewById(R.id.main_panel);
 
         // 네이버 지도 프래그먼트 가져오기
         MapFragment mapFragment = (MapFragment) getSupportFragmentManager().findFragmentById(R.id.map_fragment);
@@ -568,7 +574,7 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
                 tourResultRecycle = findViewById(R.id.tour_result_recycle);
                 tourResultRecycle.setLayoutManager(new LinearLayoutManager(TourType.this));
                 List<TourTypeData> emptyList = new ArrayList<>();
-                TourTypeAdapter emptyAdapter = new TourTypeAdapter(emptyList);
+                TourTypeAdapter emptyAdapter = new TourTypeAdapter(emptyList, TourType.this);
                 tourResultRecycle.setAdapter(emptyAdapter);
                 noDataAnim.setVisibility(View.VISIBLE);
             }
@@ -621,9 +627,18 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
             tourTypeDataList.add(tourTypeData);
         }
         // 어댑터에 리스트 전달
-        mTourTypeAdapter = new TourTypeAdapter(tourTypeDataList);
+        mTourTypeAdapter = new TourTypeAdapter(tourTypeDataList, this);     //
         tourResultRecycle.setAdapter(mTourTypeAdapter);
         tourResultRecycle.setHasFixedSize(true);
         tourResultRecycle.setLayoutManager(new LinearLayoutManager(this));
+    }
+
+    // TourTypeAdapter에서 cardView 클릭 시, SlidingUpPanelLayout 닫기
+    public void closeSlidingUpPanelLayout() {
+        if (mainPanel != null) {
+            mainPanel.setPanelState(SlidingUpPanelLayout.PanelState.COLLAPSED);
+        } else {
+            Log.d("null1   ", "null1   ");
+        }
     }
 }
