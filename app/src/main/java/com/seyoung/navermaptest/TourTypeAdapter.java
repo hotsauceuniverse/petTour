@@ -51,7 +51,6 @@ public class TourTypeAdapter extends RecyclerView.Adapter<TourTypeAdapter.ViewHo
                 // position을 클릭 리스너 내부에서 "나중에" 사용하고 있기 때문에 경고가 뜸
 //                Double mapX = Double.parseDouble(mTourTypeData.get(position).getMapX());
 //                Double mapY = Double.parseDouble(mTourTypeData.get(position).getMapY());
-
                 int currentPosition = holder.getAdapterPosition();
                 if (currentPosition != RecyclerView.NO_POSITION) {
                     Double mapX = Double.parseDouble(mTourTypeData.get(currentPosition).getMapX());
