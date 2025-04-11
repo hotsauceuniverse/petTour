@@ -13,6 +13,7 @@
     app:umanoPanelHeight="70dp"
     app:umanoOverlay="true"
     app:umanoShadowHeight="0dp"
+    app:umanoScrollableView="@id/tour_result_recycle"
     >
 
     <androidx.constraintlayout.widget.ConstraintLayout

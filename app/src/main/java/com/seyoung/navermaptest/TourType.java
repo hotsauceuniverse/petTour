@@ -1,6 +1,5 @@
 package com.seyoung.navermaptest;
 
-import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
@@ -23,14 +22,15 @@ import com.airbnb.lottie.LottieAnimationView;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.naver.maps.geometry.LatLng;
+import com.naver.maps.map.CameraAnimation;
+import com.naver.maps.map.CameraUpdate;
 import com.naver.maps.map.MapFragment;
-import com.naver.maps.map.MapView;
 import com.naver.maps.map.NaverMap;
-import com.naver.maps.map.NaverMapOptions;
 import com.naver.maps.map.OnMapReadyCallback;
 import com.naver.maps.map.UiSettings;
 import com.naver.maps.map.overlay.Marker;
 import com.naver.maps.map.overlay.OverlayImage;
+import com.naver.maps.map.util.MarkerIcons;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -60,7 +60,10 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
     private List<LatLng> markerPositions = new ArrayList<>();   // mapX와 mapY를 double타입의 전역변수 선언
     private List<Marker> markersOnMap = new ArrayList<>();  // 마커를 저장할 리스트 추가
     private SlidingUpPanelLayout mainPanel;
-    Context mContext;
+    private Double mapX;
+    private Double mapY;
+    OverlayImage icon = MarkerIcons.RED;
+    private Marker lastSelectedMarker = null; // 마지막으로 선택된 마커를 저장할 변수
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -473,6 +476,8 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
                         + "&cat1=" + selectedTourTypeCode
                         + "&MobileOS=ETC&MobileApp=AppTest";
 
+                Log.d("queryUrl   ", "queryUrl   " + queryUrl);
+
                 URL url = new URL(queryUrl);
                 InputStream inputStream = url.openStream();
 
@@ -557,9 +562,12 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
                 for (Map.Entry<String, Map<String, String>> entry : tourMapMap.entrySet()) {
                     Map<String, String> itemData = entry.getValue();
                     try {
-                        double mapX = Double.parseDouble(itemData.get("mapx"));
-                        double mapY = Double.parseDouble(itemData.get("mapy"));
+                        mapX = Double.parseDouble(itemData.get("mapx"));
+                        mapY = Double.parseDouble(itemData.get("mapy"));
                         markerPositions.add(new LatLng(mapY, mapX)); // 네이버 지도는 (위도, 경도) 순서
+
+                        Log.d("asdmapX   ", "asdmapX   " + mapX);
+                        Log.d("asdmapY   ", "asdmapY   " + mapY);
                     } catch (NumberFormatException e) {
                         e.printStackTrace();
                     }
@@ -623,20 +631,47 @@ public class TourType extends AppCompatActivity implements OnMapReadyCallback {
             Log.d("tourType   ", "tourType   " + tourType);
 
             // TourTypeData 객체 생성
-            TourTypeData tourTypeData = new TourTypeData(title, tourType, address);
+            TourTypeData tourTypeData = new TourTypeData(title, tourType, address, itemData.get("mapx"), itemData.get("mapy"));
             tourTypeDataList.add(tourTypeData);
         }
         // 어댑터에 리스트 전달
-        mTourTypeAdapter = new TourTypeAdapter(tourTypeDataList, this);     //
+        mTourTypeAdapter = new TourTypeAdapter(tourTypeDataList, this);
         tourResultRecycle.setAdapter(mTourTypeAdapter);
         tourResultRecycle.setHasFixedSize(true);
         tourResultRecycle.setLayoutManager(new LinearLayoutManager(this));
     }
 
     // TourTypeAdapter에서 cardView 클릭 시, SlidingUpPanelLayout 닫기
-    public void closeSlidingUpPanelLayout() {
+    // 위도, 경도가 어떤 리스트를 클릭 하더라도 리스트 마지막 위도, 경도로만 입력됨
+    // (double mapX, double mapY)을 TourTypeAdapter로 매개변수(파라메터)를 넘기고
+    public void closeSlidingUpPanelLayout(double mapX, double mapY) {
         if (mainPanel != null) {
             mainPanel.setPanelState(SlidingUpPanelLayout.PanelState.COLLAPSED);
+
+            Log.d("asdmapXX   ", "asdmapXX   " + mapX);
+            Log.d("asdmapYY   ", "asdmapYY   " + mapY);
+
+            // 이전에 선택된 마커가 있다면 기본 아이콘으로 되돌림
+            if (lastSelectedMarker != null) {
+                lastSelectedMarker.setIcon(Marker.DEFAULT_ICON);
+            }
+
+            // 선택된 장소 marker색 변경
+            Marker marker = new Marker();
+            marker.setPosition(new LatLng(mapY, mapX));
+            marker.setIcon(icon);
+            marker.setMap(naverMap);
+            markersOnMap.add(marker);
+
+            // 이번에 선택된 마커를 마지막 선택 마커로 저장
+            lastSelectedMarker = marker;
+
+            // cardView 닫고 해당 지역으로 focus 이동
+            // https://navermaps.github.io/android-map-sdk/guide-ko/3-2.html
+            CameraUpdate cameraUpdate = CameraUpdate
+                    .scrollTo(new LatLng(mapY, mapX))   // 네이버 지도는 (위도, 경도) 순서
+                    .animate(CameraAnimation.Fly, 3000);
+            naverMap.moveCamera(cameraUpdate);
         } else {
             Log.d("null1   ", "null1   ");
         }
